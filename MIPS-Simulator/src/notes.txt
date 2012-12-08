@@ -1,0 +1,32 @@
+main() {
+    init();
+    for() {
+        WB();
+        ...
+        M3();
+        pipeline reg
+        M2();
+        pipeline reg
+        M1();
+        pipeline reg
+        EX();
+        pipeline reg
+        ID();
+        pipeline reg
+        IF2();
+        pipeline reg
+        IF1();
+        cycle++;
+        print();
+    }
+}
+
+Reguster Structure
+    Value
+    Number
+    Ready
+
+Set ready bit in ID()
+    Set to 0 in ID
+    Check in next instruction
+    Set to 1 in EX()
