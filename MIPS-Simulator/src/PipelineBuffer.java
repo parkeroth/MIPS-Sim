@@ -33,6 +33,8 @@ public class PipelineBuffer {
   /* Other */
   public int                pcSrc;
   public int                nextPC;
+  public boolean            getData1;
+  public boolean            getData2;
 
   public PipelineBuffer(Instruction curInstr, int num) {
     instructNum = num;

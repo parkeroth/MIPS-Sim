@@ -88,33 +88,48 @@ public class Simulator {
 
   private void EX() {
     if ((curBuffer = getBuffer(4)) != null) {
-      System.out.print(" I" + curBuffer.instructNum + "-EX");
-      int operand1 = curBuffer.readData1;
-      int operand2;
-      if (curBuffer.aluSrc == 1) {
-        operand2 = curBuffer.readData2;
+      // Check if a stall is required
+      System.out.print(" I" + curBuffer.instructNum);
+      if (shouldStall()) {
+        stalling = true;
+        System.out.print("-stall");
+        bufferList.add(3, null);
       } else {
-        operand2 = curBuffer.immediate;
-      }
+        System.out.print("-EX");
+        // Read register data
+        if (curBuffer.getData1) {
+          curBuffer.readData1 = getReadData(curBuffer.readReg1);
+        }
+        if (curBuffer.getData2) {
+          curBuffer.readData2 = getReadData(curBuffer.readReg2);
+        }
+        int operand1 = curBuffer.readData1;
+        int operand2;
+        if (curBuffer.aluSrc == 1) {
+          operand2 = curBuffer.readData2;
+        } else {
+          operand2 = curBuffer.immediate;
+        }
 
-      switch (curBuffer.opcode) {
-      case DADD:
-        curBuffer.aluResult = operand1 + operand2;
-        break;
-      case SUB:
-        curBuffer.aluResult = operand1 - operand2;
-        break;
-      case LD:
-        curBuffer.aluResult = operand1 + operand2;
-        break;
-      case SD:
-        curBuffer.aluResult = operand1 + operand2;
-        break;
-      case BNEZ:
-        curBuffer.zero = (operand1 == 0) ? true : false;
-        break;
-      default:
-        System.out.println("NOT VALID OPCODE");
+        switch (curBuffer.opcode) {
+        case DADD:
+          curBuffer.aluResult = operand1 + operand2;
+          break;
+        case SUB:
+          curBuffer.aluResult = operand1 - operand2;
+          break;
+        case LD:
+          curBuffer.aluResult = operand1 + operand2;
+          break;
+        case SD:
+          curBuffer.aluResult = operand1 + operand2;
+          break;
+        case BNEZ:
+          curBuffer.zero = (operand1 == 0) ? true : false;
+          break;
+        default:
+          System.out.println("NOT VALID OPCODE");
+        }
       }
     }
   }
@@ -129,63 +144,52 @@ public class Simulator {
   private void ID() {
     if ((curBuffer = getBuffer(3)) != null) {
       System.out.print(" I" + curBuffer.instructNum);
-      Instruction curInstr = curBuffer.instr;
-      boolean getData1 = false, getData2 = false;
-      // Set control bits based on op code
-      curBuffer.setControlSignals();
-      // Decode read1
-      if (curInstr.rs != null) {
-        // If Source is a register
-        if (curInstr.rs.charAt(0) == 'R') {
-          int regNum = Integer.valueOf(curInstr.rs.substring(1));
-          curBuffer.readReg1 = regNum;
-          getData1 = true;
-        } else {
-          System.out.println(curInstr.rd + " is not a register!");
-        }
-      }
-      // Decode read2 if rt not the destination register
-      if (curInstr.rt != null) {
-        // If Source is a register
-        if (curInstr.rt.charAt(0) == 'R') {
-          int regNum = Integer.valueOf(curInstr.rt.substring(1));
-          curBuffer.readReg2 = regNum;
-          if (curBuffer.memRead != 1) {
-            getData2 = true;
+      if (!stalling) {
+        Instruction curInstr = curBuffer.instr;
+        // Set control bits based on op code
+        curBuffer.setControlSignals();
+        // Decode read1
+        if (curInstr.rs != null) {
+          // If Source is a register
+          if (curInstr.rs.charAt(0) == 'R') {
+            int regNum = Integer.valueOf(curInstr.rs.substring(1));
+            curBuffer.readReg1 = regNum;
+            curBuffer.getData1 = true;
+          } else {
+            System.out.println(curInstr.rd + " is not a register!");
           }
-        } else if (curInstr.rt.charAt(0) == '#') {
-          curBuffer.immediate = Integer.valueOf(curInstr.rt.substring(1));
-          curBuffer.aluSrc = 0;
-        } else {
-          System.out.println(curInstr.rd + " is not a register!");
         }
-      }
-      // Decode writeReg
-      if (curBuffer.regDst == 0 && curInstr.rd != null) {
-        curBuffer.writeReg = Integer.valueOf(curInstr.rd.substring(1)).intValue();
-      } else if (curBuffer.regDst == 1 && curInstr.rt != null) {
-        curBuffer.writeReg = Integer.valueOf(curInstr.rt.substring(1));
-      }
-      // Decode immediate
-      if (curInstr.immediate != null) {
-        curBuffer.immediate = curInstr.immediate;
-        // Calculate the address of next instruction for BNEZ
-        curBuffer.branchAddr = curBuffer.curPC + curBuffer.immediate;
-      }
-      // Check if a stall is required
-      if (shouldStall()) {
-        stalling = true;
-        System.out.print("-stall");
-        bufferList.add(2, null);
-      } else {
-        // Read register data
-        if (getData1) {
-          curBuffer.readData1 = getReadData(curBuffer.readReg1);
+        // Decode read2 if rt not the destination register
+        if (curInstr.rt != null) {
+          // If Source is a register
+          if (curInstr.rt.charAt(0) == 'R') {
+            int regNum = Integer.valueOf(curInstr.rt.substring(1));
+            curBuffer.readReg2 = regNum;
+            if (curBuffer.memRead != 1) {
+              curBuffer.getData2 = true;
+            }
+          } else if (curInstr.rt.charAt(0) == '#') {
+            curBuffer.immediate = Integer.valueOf(curInstr.rt.substring(1));
+            curBuffer.aluSrc = 0;
+          } else {
+            System.out.println(curInstr.rd + " is not a register!");
+          }
         }
-        if (getData2) {
-          curBuffer.readData2 = getReadData(curBuffer.readReg2);
+        // Decode writeReg
+        if (curBuffer.regDst == 0 && curInstr.rd != null) {
+          curBuffer.writeReg = Integer.valueOf(curInstr.rd.substring(1)).intValue();
+        } else if (curBuffer.regDst == 1 && curInstr.rt != null) {
+          curBuffer.writeReg = Integer.valueOf(curInstr.rt.substring(1));
+        }
+        // Decode immediate
+        if (curInstr.immediate != null) {
+          curBuffer.immediate = curInstr.immediate;
+          // Calculate the address of next instruction for BNEZ
+          curBuffer.branchAddr = curBuffer.curPC + curBuffer.immediate;
         }
         System.out.print("-ID");
+      } else {
+        System.out.print("-stall");
       }
     }
   }
@@ -216,7 +220,7 @@ public class Simulator {
     updatePC();
     int instrNum = instructionsFetched + 1;
     Instruction curInstruct = (pc < instructionMemory.size()) ? instructionMemory.get(pc) : null;
-    if (curInstruct != null && !killing) {
+    if (curInstruct != null && !killing && !stalling) {
       if (!stalling) {
         System.out.print(" I" + instrNum + "-IF1");
         curBuffer = new PipelineBuffer(curInstruct, instrNum);
@@ -309,14 +313,14 @@ public class Simulator {
    */
   private boolean shouldStall() {
     boolean stall = false;
-    PipelineBuffer idBuff = getBuffer(3);
+    PipelineBuffer exBuff = getBuffer(4);
     // For every instruction in EX through WB
-    for (int i = 4; i < 6; i++) {
+    for (int i = 5; i < 7; i++) {
       PipelineBuffer forwardBuff = getBuffer(i);
       if (forwardBuff != null) {
-        if (idBuff.readReg1 == forwardBuff.writeReg && forwardBuff.opcode == Instruction.Opcode.LD) {
+        if (exBuff.readReg1 == forwardBuff.writeReg && forwardBuff.opcode == Instruction.Opcode.LD) {
           stall = true;
-        } else if (idBuff.readReg2 == forwardBuff.writeReg
+        } else if (exBuff.readReg2 == forwardBuff.writeReg
             && forwardBuff.opcode == Instruction.Opcode.LD) {
           stall = true;
         }
@@ -378,25 +382,39 @@ public class Simulator {
     if (args.length > 0) {
       inputPath = args[0];
     } else {
-      BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-      System.out.println("MIPS Simulator");
-      System.out.print("Input file path: ");
-      try {
-         inputPath = reader.readLine();
-      } catch (IOException ioe) {
-         System.out.println("IO error reading input path!");
-         System.exit(1);
-      }
-      String outputPath = null;
-      System.out.print("Output file path: ");
-      try {
-         outputPath = reader.readLine();
-      } catch (IOException ioe) {
-         System.out.println("IO error reading output path!");
-         System.exit(1);
-      }
+      String doAnother = null;
+      do {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        System.out.println("MIPS Simulator");
+        System.out.print("Input file path: ");
+        try {
+           inputPath = reader.readLine();
+        } catch (IOException ioe) {
+           System.out.println("IO error reading input path!");
+           System.exit(1);
+        }
+        String outputPath = null;
+        System.out.print("Output file path: ");
+        try {
+           outputPath = reader.readLine();
+        } catch (IOException ioe) {
+           System.out.println("IO error reading output path!");
+           System.exit(1);
+        }
+        
+        Simulator sim = new Simulator(inputPath);
+        sim.runSimulation();
+        
+        System.out.print("Run another simulation (y/n): ");
+        try {
+          doAnother = reader.readLine();
+        } catch (IOException ioe) {
+           System.out.println("IO error reading your choice!");
+           System.exit(1);
+        }
+      } while (doAnother.equals("y"));
+      System.out.println("Shutting down.");
     }
-    Simulator sim = new Simulator(inputPath);
-    sim.runSimulation();
+    
   }
 }
