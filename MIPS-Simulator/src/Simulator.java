@@ -19,6 +19,8 @@ public class Simulator {
   private boolean                    endOfInstructionMem;
   private boolean                    finishedLastCycle;
   private boolean                    stalling;
+  private boolean                    killing;
+  private int                        instructionsFetched;
 
   public Simulator(String inputPath) {
     InputParser parser = new InputParser(inputPath);
@@ -34,8 +36,10 @@ public class Simulator {
     endOfInstructionMem = false;
     finishedLastCycle = false;
     stalling = false;
+    killing = false;
     pc = 0;
     cc = 1;
+    instructionsFetched = 0;
   }
 
   private void WB() {
@@ -210,15 +214,16 @@ public class Simulator {
    */
   private void IF1() {
     updatePC();
+    int instrNum = instructionsFetched + 1;
     Instruction curInstruct = (pc < instructionMemory.size()) ? instructionMemory.get(pc) : null;
-    int instrNum = pc + 1;
-    if (curInstruct != null) {
+    if (curInstruct != null && !killing) {
       if (!stalling) {
         System.out.print(" I" + instrNum + "-IF1");
         curBuffer = new PipelineBuffer(curInstruct, instrNum);
         curBuffer.curPC = pc;
         pc += 1; // Increment PC
         bufferList.addFirst(curBuffer);
+        instructionsFetched++;
       } else {
         System.out.print(" I" + instrNum + "-stall");
       }
@@ -227,6 +232,7 @@ public class Simulator {
       endOfInstructionMem = true;
     }
     stalling = false;
+    killing = false;
   }
 
   /**
@@ -244,6 +250,7 @@ public class Simulator {
    * Kills instructions in the IF2 and ID stages.
    */
   private void killBadInstructions() {
+    killing = true;
     bufferList.set(0, null);
     bufferList.set(1, null);
   }
