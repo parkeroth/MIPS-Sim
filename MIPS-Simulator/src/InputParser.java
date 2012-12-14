@@ -2,10 +2,11 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,9 +25,10 @@ public class InputParser {
       reader = new BufferedReader(new FileReader(inputPath));
     } catch (FileNotFoundException e) {
       logger.log(Level.SEVERE, "Couldn't open file: " + inputPath);
+      System.exit(1);
     }
     registerFile = new HashMap<Integer, Integer>();
-    mainMemory = new HashMap<Integer, Integer>();
+    mainMemory = new TreeMap<Integer, Integer>();
     targetMap = new HashMap<String, Integer>();
     instructionMemory = new ArrayList<Instruction>();
     instructionList = new ArrayList<String>();

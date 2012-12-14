@@ -8,6 +8,7 @@ import java.io.*;
  *
  */
 public class Simulator {
+  private BufferedWriter             outputWriter;
   private static int                 PIPELINE_DEPTH = 8;
   private Map<Integer, Integer>      registerFile;
   private Map<Integer, Integer>      mainMemory;
@@ -22,9 +23,10 @@ public class Simulator {
   private boolean                    killing;
   private int                        instructionsFetched;
 
-  public Simulator(String inputPath) {
+  public Simulator(String inputPath, String outputPath) {
     InputParser parser = new InputParser(inputPath);
     try {
+      outputWriter = new BufferedWriter(new FileWriter(outputPath));
       parser.parseFile();
     } catch (Exception e) {
       System.out.println(e.toString());
@@ -41,10 +43,29 @@ public class Simulator {
     cc = 1;
     instructionsFetched = 0;
   }
+  
+  private void writeOutput(String str, boolean newLine) {
+    try {
+      if (str != null) {
+        outputWriter.write(str);
+        System.out.print(str);
+      }
+      if (newLine) {
+        outputWriter.newLine();
+        System.out.println();
+      }
+    } catch (IOException e) {
+      System.out.println("ERROR: writing to file" + e.toString());
+    }
+  }
+  
+  private void writeOutput(String str){
+    writeOutput(str, false);
+  }
 
   private void WB() {
     if ((curBuffer = getBuffer(8)) != null) {
-      System.out.print(" I" + curBuffer.instructNum + "-WB");
+      writeOutput(" I" + curBuffer.instructNum + "-WB");
       bufferList.removeLast();
       if (curBuffer.memToReg == 1) {
         registerFile.put(curBuffer.writeReg, curBuffer.memData);
@@ -60,21 +81,21 @@ public class Simulator {
 
   private void MEM3() {
     if ((curBuffer = getBuffer(7)) != null) {
-      System.out.print(" I" + curBuffer.instructNum + "-MEM3");
+      writeOutput(" I" + curBuffer.instructNum + "-MEM3");
       // NOP
     }
   }
 
   private void MEM2() {
     if ((curBuffer = getBuffer(6)) != null) {
-      System.out.print(" I" + curBuffer.instructNum + "-MEM2");
+      writeOutput(" I" + curBuffer.instructNum + "-MEM2");
       // NOP
     }
   }
 
   private void MEM1() {
     if ((curBuffer = getBuffer(5)) != null) {
-      System.out.print(" I" + curBuffer.instructNum + "-MEM1");
+      writeOutput(" I" + curBuffer.instructNum + "-MEM1");
       int address = curBuffer.aluResult;
       if (curBuffer.memRead == 1) {
         int readData = mainMemory.get(address);
@@ -89,13 +110,13 @@ public class Simulator {
   private void EX() {
     if ((curBuffer = getBuffer(4)) != null) {
       // Check if a stall is required
-      System.out.print(" I" + curBuffer.instructNum);
+      writeOutput(" I" + curBuffer.instructNum);
       if (shouldStall()) {
         stalling = true;
-        System.out.print("-stall");
+        writeOutput("-stall");
         bufferList.add(3, null);
       } else {
-        System.out.print("-EX");
+        writeOutput("-EX");
         // Read register data
         if (curBuffer.getData1) {
           curBuffer.readData1 = getReadData(curBuffer.readReg1);
@@ -128,7 +149,7 @@ public class Simulator {
           curBuffer.zero = (operand1 == 0) ? true : false;
           break;
         default:
-          System.out.println("NOT VALID OPCODE");
+          writeOutput("NOT VALID OPCODE");
         }
       }
     }
@@ -143,7 +164,7 @@ public class Simulator {
    */
   private void ID() {
     if ((curBuffer = getBuffer(3)) != null) {
-      System.out.print(" I" + curBuffer.instructNum);
+      writeOutput(" I" + curBuffer.instructNum);
       if (!stalling) {
         Instruction curInstr = curBuffer.instr;
         // Set control bits based on op code
@@ -156,7 +177,7 @@ public class Simulator {
             curBuffer.readReg1 = regNum;
             curBuffer.getData1 = true;
           } else {
-            System.out.println(curInstr.rd + " is not a register!");
+            writeOutput(curInstr.rd + " is not a register!");
           }
         }
         // Decode read2 if rt not the destination register
@@ -172,7 +193,7 @@ public class Simulator {
             curBuffer.immediate = Integer.valueOf(curInstr.rt.substring(1));
             curBuffer.aluSrc = 0;
           } else {
-            System.out.println(curInstr.rd + " is not a register!");
+            writeOutput(curInstr.rd + " is not a register!");
           }
         }
         // Decode writeReg
@@ -187,9 +208,9 @@ public class Simulator {
           // Calculate the address of next instruction for BNEZ
           curBuffer.branchAddr = curBuffer.curPC + curBuffer.immediate;
         }
-        System.out.print("-ID");
+        writeOutput("-ID");
       } else {
-        System.out.print("-stall");
+        writeOutput("-stall");
       }
     }
   }
@@ -201,9 +222,9 @@ public class Simulator {
   private void IF2() {
     if ((curBuffer = getBuffer(2)) != null) {
       if (stalling) {
-        System.out.print(" I" + curBuffer.instructNum + "-stall");
+        writeOutput(" I" + curBuffer.instructNum + "-stall");
       } else {
-        System.out.print(" I" + curBuffer.instructNum + "-IF2");
+        writeOutput(" I" + curBuffer.instructNum + "-IF2");
         // NOP
       }
     }
@@ -222,14 +243,14 @@ public class Simulator {
     Instruction curInstruct = (pc < instructionMemory.size()) ? instructionMemory.get(pc) : null;
     if (curInstruct != null && !killing && !stalling) {
       if (!stalling) {
-        System.out.print(" I" + instrNum + "-IF1");
+        writeOutput(" I" + instrNum + "-IF1");
         curBuffer = new PipelineBuffer(curInstruct, instrNum);
         curBuffer.curPC = pc;
         pc += 1; // Increment PC
         bufferList.addFirst(curBuffer);
         instructionsFetched++;
       } else {
-        System.out.print(" I" + instrNum + "-stall");
+        writeOutput(" I" + instrNum + "-stall");
       }
     } else if (!stalling) {
       bufferList.addFirst(null);
@@ -278,7 +299,7 @@ public class Simulator {
   private Integer getReadData(int regNum) {
     Integer data = null;
     // For every instruction in EX through WB
-    for (int i = PIPELINE_DEPTH - 1; i > 3; i--) {
+    for (int i = PIPELINE_DEPTH - 1; i > 4; i--) {
       PipelineBuffer forwardBuff = getBuffer(i);
       // If instruct will write into one of id's operands
       if (forwardBuff != null && forwardBuff.regWrite == 1 && forwardBuff.writeReg == regNum) {
@@ -347,19 +368,19 @@ public class Simulator {
   }
 
   public void printResults() {
-    System.out.println("REGISTERS");
+    writeOutput("REGISTERS", true);
     for (Integer regNum : registerFile.keySet()) {
-      System.out.println("R" + regNum + " " + registerFile.get(regNum));
+      writeOutput("R" + regNum + " " + registerFile.get(regNum), true);
     }
-    System.out.println("MEMORY");
+    writeOutput("MEMORY", true);
     for (Integer address : mainMemory.keySet()) {
-      System.out.println(address + " " + mainMemory.get(address));
+      writeOutput(address + " " + mainMemory.get(address), true);
     }
   }
 
   public void runSimulation() {
     while (keepGoing()) {
-      System.out.print("c#" + cc);
+      writeOutput("c#" + cc);
       WB();
       MEM3();
       MEM2();
@@ -369,9 +390,15 @@ public class Simulator {
       IF2();
       IF1();
       cc++;
-      System.out.println();
+      writeOutput(null, true);
     }
     printResults();
+    try {
+      outputWriter.flush();
+      outputWriter.close();
+    } catch (Exception e) {
+      System.out.println(e.toString());
+    }
   }
 
   /**
@@ -379,6 +406,7 @@ public class Simulator {
    */
   public static void main(String[] args) {
     String inputPath = null;
+    System.out.println(new File(".").getAbsolutePath());
     if (args.length > 0) {
       inputPath = args[0];
     } else {
@@ -402,7 +430,7 @@ public class Simulator {
            System.exit(1);
         }
         
-        Simulator sim = new Simulator(inputPath);
+        Simulator sim = new Simulator(inputPath, outputPath);
         sim.runSimulation();
         
         System.out.print("Run another simulation (y/n): ");
